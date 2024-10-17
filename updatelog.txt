@@ -1,0 +1,2 @@
+первая версия с tensorflow, созданная после обновления памяти
+Generative Cock Model
