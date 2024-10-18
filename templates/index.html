@@ -2,32 +2,44 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Чат с ИИ</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <title>Обучение и генерация текста</title>
+    <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
-    <h1>Обучение ИИ на чате</h1>
+    <h1>Обучение модели</h1>
     <form action="/train" method="post" enctype="multipart/form-data">
-        <label for="file">Загрузите файл чата (в формате .txt):</label>
-        <input type="file" id="file" name="file" accept=".txt" required>
+        <label for="file">Выберите файл чата (.txt):</label>
+        <input type="file" id="file" name="file">
         <button type="submit">Обучить модель</button>
     </form>
 
-    <h2>Общение с ИИ</h2>
-    <form id="chat-form" action="/generate" method="post">
-        <label for="participant">Выберите участника чата:</label>
-        <select id="participant" name="participant" required>
-            {% for participant in participants.keys() %}
-                <option value="{{ participant }}">{{ participant }}</option>
+    <h1>Генерация ответа</h1>
+    <form action="/generate" method="post" id="generate-form">
+        <label for="participant">Выберите участника:</label>
+        <select id="participant" name="participant">
+            {% for key, value in participants.items() %}
+            <option value="{{ key }}">{{ value }}</option>
             {% endfor %}
         </select>
-        
-        <button type="submit">Сгенерировать сообщение</button>
+        <button type="submit">Сгенерировать</button>
     </form>
 
-    <div id="chat-window">
-        <div id="messages"></div>
+    <div id="response">
+        <h2>Ответ:</h2>
+        <p id="generated-text"></p>
     </div>
+
+    <script>
+        document.getElementById('generate-form').onsubmit = async (e) => {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            const response = await fetch('/generate', {
+                method: 'POST',
+                body: formData
+            });
+            const data = await response.json();
+            document.getElementById('generated-text').textContent = data.reply;
+        };
+    </script>
 </body>
 </html>
