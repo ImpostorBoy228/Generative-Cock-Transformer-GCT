@@ -1,60 +1,130 @@
-from flask import Flask, render_template, request, jsonify
-import numpy as np
-import tensorflow as tf
-from tensorflow import keras
-from tensorflow.keras import layers
+from flask import Flask, request, jsonify, render_template
+import os
+from transformers import GPT2LMHeadModel, GPT2Tokenizer, Trainer, TrainingArguments
+import torch
+from torch.utils.data import Dataset
 
 app = Flask(__name__)
+app.config['UPLOAD_FOLDER'] = 'uploads/'
 
-# Placeholder for trained model
-model = None
+# Инициализация модели и токенизатора
+model_name = "gpt2"
+tokenizer = GPT2Tokenizer.from_pretrained(model_name)
+model = GPT2LMHeadModel.from_pretrained(model_name)
 
-def create_model(vocab_size, embedding_dim, input_length):
-    model = keras.Sequential([
-        layers.Embedding(vocab_size, embedding_dim, input_length=input_length),
-        layers.LSTM(128),
-        layers.Dense(vocab_size, activation='softmax')
-    ])
-    model.compile(loss='sparse_categorical_crossentropy', optimizer='adam', metrics=['accuracy'])
-    return model
+# Установка токена паддинга
+tokenizer.pad_token = tokenizer.eos_token
 
-def preprocess_text(text):
-    # Example preprocessing; should be adjusted based on your needs
-    # Tokenization and conversion to sequences should be done here
-    return text.split()
+# Список участников для имитации стиля
+participants = {
+    "фейт имба": "Стиль фейта имбы",
+    "Sussy Baka 1": "Стиль Sussy Baka 1",
+    "Георгий": "Стиль Георгия",
+    "К слову, работаю на Спидвагона": "Стиль Спидвагона",
+    "СыроESHKA": "Стиль СыроESHKA",
+    "Амогус 2": "Стиль Амогуса 2"
+}
+
+class ChatDataset(Dataset):
+    def __init__(self, chats):
+        self.examples = tokenizer(chats, return_tensors='pt', padding=True, truncation=True, max_length=512)
+        self.labels = self.examples['input_ids'].clone()
+
+    def __len__(self):
+        return len(self.examples['input_ids'])
+
+    def __getitem__(self, idx):
+        return {
+            'input_ids': self.examples['input_ids'][idx],
+            'attention_mask': self.examples['attention_mask'][idx],
+            'labels': self.labels[idx],
+        }
+
+def parse_chat(chat_data):
+    parsed_messages = []
+    current_participant = None
+    message_buffer = []
+
+    for line in chat_data.splitlines():
+        if any(participant in line for participant in participants.keys()):
+            if message_buffer:
+                parsed_messages.append((current_participant, " ".join(message_buffer)))
+                message_buffer = []
+            current_participant = line.split(' ')[0]
+        else:
+            message_buffer.append(line)
+
+    if message_buffer:
+        parsed_messages.append((current_participant, " ".join(message_buffer)))
+
+    return parsed_messages
+
+def train_model(chat_data):
+    parsed_data = parse_chat(chat_data)
+    training_texts = [f"{participant}: {text}" for participant, text in parsed_data]
+
+    dataset = ChatDataset("\n".join(training_texts))
+
+    training_args = TrainingArguments(
+        output_dir='./results',
+        per_device_train_batch_size=1,
+        num_train_epochs=1,
+        save_steps=100,
+        save_total_limit=2,
+        logging_dir='./logs',
+        logging_steps=10,
+    )
+
+    trainer = Trainer(
+        model=model,
+        args=training_args,
+        train_dataset=dataset,
+    )
+
+    trainer.train()
+
+def generate_response(participant_style):
+    prompt = f"{participant_style}:"
+    inputs = tokenizer(prompt, return_tensors='pt').to(model.device)
+
+    outputs = model.generate(inputs['input_ids'], max_length=50, num_return_sequences=1)
+    response = tokenizer.decode(outputs[0], skip_special_tokens=True)
+
+    return response
 
 @app.route('/')
 def index():
-    return render_template('index.html')
+    return render_template('index.html', participants=participants)
 
 @app.route('/train', methods=['POST'])
 def train():
-    global model
+    if 'file' not in request.files:
+        return "Нет файла для загрузки", 400
 
-    # Get text input from the user
-    text = request.form['chat']
-    
-    # Preprocess text
-    sequences = preprocess_text(text)
+    file = request.files['file']
 
-    # For demonstration, we will just create dummy input data and labels
-    vocab = set(sequences)
-    vocab_size = len(vocab)
-    embedding_dim = 50
-    input_length = 10  # Length of input sequences
+    if file.filename == '':
+        return "Нет выбранного файла", 400
 
-    # Create model if it doesn't exist
-    if model is None:
-        model = create_model(vocab_size, embedding_dim, input_length)
+    if file and file.filename.endswith('.txt'):
+        filepath = os.path.join(app.config['UPLOAD_FOLDER'], file.filename)
+        file.save(filepath)
 
-    # Dummy data for training
-    x_train = np.random.randint(0, vocab_size, (1000, input_length))  # Example training data
-    y_train = np.random.randint(0, vocab_size, 1000)  # Example labels
+        with open(filepath, 'r', encoding='utf-8') as f:
+            chat_data = f.read()
 
-    # Train the model
-    model.fit(x_train, y_train, epochs=5)  # Adjust epochs as needed
+        train_model(chat_data)
+        return "Обучение завершено", 200
+    else:
+        return "Неправильный формат файла", 400
 
-    return jsonify({'message': 'Training completed.'})
+@app.route('/generate', methods=['POST'])
+def generate():
+    selected_participant = request.form['participant']
+    participant_style = participants.get(selected_participant, "Unknown")
+
+    reply = generate_response(participant_style)
+    return jsonify({'reply': reply})
 
 if __name__ == '__main__':
     app.run(debug=True, port=8080)
