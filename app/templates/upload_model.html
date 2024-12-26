@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Обучение модели</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <h1>Обучение модели</h1>
+
+        <!-- Форма для загрузки файла -->
+        <form action="{{ url_for('routes.upload_model') }}" method="post" enctype="multipart/form-data">
+            <label for="file">Загрузите файл для обучения:</label>
+            <input type="file" name="file" id="file" required>
+            <button type="submit">Загрузить</button>
+        </form>
+
+        <!-- Форма для обучения модели -->
+        <form action="{{ url_for('routes.train_model') }}" method="get">
+            <button type="submit" class="train-model-btn">Обучить модель</button>
+        </form>
+
+        {% if message %}
+            <p>{{ message }}</p>
+        {% endif %}
+    </div>
+</body>
+</html>

@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Чат с GCT</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <h1>Чат с GCT</h1>
+
+        <!-- История чата -->
+        <div class="chat-box">
+            <div class="chat-history">
+                {% for message in chat_history %}
+                    <div class="message {{ message['role'] }}">
+                        <strong>
+                            {% if message['role'] == 'user' %}
+                                ImpostorBoy:
+                            {% else %}
+                                GCT:
+                            {% endif %}
+                        </strong>
+                        <p>{{ message['content'] }}</p>
+                    </div>
+                {% endfor %}
+            </div>
+
+            <!-- Прогресс-бар генерации -->
+            <div id="progress-bar" class="progress-bar">
+                <div id="progress" style="width: 0%;"></div>
+            </div>
+
+            <!-- Форма отправки сообщения -->
+            <form action="{{ url_for('routes.chat') }}" method="post" class="chat-form">
+                <input type="text" name="message" placeholder="Напишите сообщение..." required>
+                <button type="submit">Отправить</button>
+            </form>
+
+            <!-- Кнопка очистки истории -->
+            <form action="{{ url_for('routes.clear_history') }}" method="post">
+                <button type="submit" class="clear-history-btn">Очистить историю</button>
+            </form>
+        </div>
+
+        <hr>
+
+        <!-- Раздел обучения модели -->
+        <div class="model-training">
+            <h2>Обучение модели</h2>
+
+            <!-- Форма для загрузки файла -->
+            <form action="{{ url_for('routes.upload_model') }}" method="post" enctype="multipart/form-data">
+                <label for="file">Загрузите файл для обучения:</label>
+                <input type="file" name="file" id="file" required>
+                <button type="submit">Загрузить</button>
+            </form>
+
+            <!-- Кнопка для начала обучения модели -->
+            <form action="{{ url_for('routes.train_model') }}" method="get">
+                <button type="submit" class="train-model-btn">Обучить модель</button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // Функция для обновления прогресса
+        function updateProgressBar(progress) {
+            const progressBar = document.getElementById('progress');
+            progressBar.style.width = progress + '%';
+        }
+
+        // Пример обновления прогресса
+        let progress = 0;
+        const interval = setInterval(() => {
+            progress += 10;
+            updateProgressBar(progress);
+            if (progress >= 100) clearInterval(interval);
+        }, 500);
+    </script>
+</body>
+</html>
